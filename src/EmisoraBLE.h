@@ -19,7 +19,7 @@
 // ----------------------------------------------------------
 // ----------------------------------------------------------
 
-#include "ServicioEnEmisora.h"
+#include "ServicioEnEmisora.h" //Incluye el servicio de la emisora BLE
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
@@ -27,20 +27,23 @@
 class EmisoraBLE {
 private:
 
-  const char * nombreEmisora;
-  const uint16_t fabricanteID;
-  const int8_t txPower;
+  const char * nombreEmisora; //nombre de la emisora
+  const uint16_t fabricanteID; //id fabricante del disp
+  const int8_t txPower;        // Potencia de transmision del anuncio ble
 
 public:
 
   // .........................................................
   // .........................................................
 
+  // Definiciones de los tipos de callback para manejar conexiones BLE
   using CallbackConexionEstablecida = void ( uint16_t connHandle );
   using CallbackConexionTerminada = void ( uint16_t connHandle, uint8_t reason);
 
   // .........................................................
   // .........................................................
+
+  // Constructor de la clase EmisoraBLE
   EmisoraBLE( const char * nombreEmisora_, const uint16_t fabricanteID_,
 			  const int8_t txPower_ ) 
 	:
@@ -65,6 +68,7 @@ public:
   // .........................................................
   // .........................................................
 
+  // Sobrecarga de encenderEmisora() con callbacks para conexión establecida y terminada
   void encenderEmisora( CallbackConexionEstablecida cbce,
 						CallbackConexionTerminada cbct ) {
 
@@ -89,48 +93,170 @@ public:
   // .........................................................
 
   // .........................................................
+
+  // Método que verifica si la emisora está anunciando
   bool estaAnunciando() {
 	return Bluefruit.Advertising.isRunning();
   } // ()
 
   // .........................................................
   // .........................................................
+  
+  // Emite un anuncio iBeacon con los datos de UUID, major, minor y rssi
   void emitirAnuncioIBeacon( uint8_t * beaconUUID, int16_t major, int16_t minor, uint8_t rssi ) {
 
-	(*this).detenerAnuncio();
+	(*this).detenerAnuncio();// Detiene cualquier anuncio en ejecución
 	
-	//
-	// creo el beacon 
-	//
+  // Crea el beacon con los parámetros UUID, major, minor y RSSI
 	
 	BLEBeacon elBeacon( beaconUUID, major, minor, rssi );
-	elBeacon.setManufacturer( (*this).fabricanteID );
+	elBeacon.setManufacturer( (*this).fabricanteID ); // Establece el ID del fabricante
 
 
-	Bluefruit.setTxPower( (*this).txPower );
+	Bluefruit.setTxPower( (*this).txPower ); // Establece la potencia de transmisión
 	Bluefruit.setName( (*this).nombreEmisora );
-	Bluefruit.ScanResponse.addName()
-
-	//
-	// pongo el beacon
-	//
-	
+	Bluefruit.ScanResponse.addName()         // Añade el nombre en la respuesta de escaneo
+ 
+	// Configura el beacon en la publicidad BLE
 	Bluefruit.Advertising.setBeacon( elBeacon );
 
-	//
-	// ? qué valorers poner aquí
-	//
-	Bluefruit.Advertising.restartOnDisconnect(true); // no hace falta, pero lo pongo
-	Bluefruit.Advertising.setInterval(100, 100);    // in unit of 0.625 ms
+	// Configuración de la publicidad BLE (tiempo, intervalos)
+	Bluefruit.Advertising.restartOnDisconnect(true); // Reinicia la publicidad si se desconecta
+	Bluefruit.Advertising.setInterval(100, 100);    //  Intervalo de 0.625ms
 
-	//
-	// empieza el anuncio, 0 = tiempo indefinido (ya lo pararán)
-	//
+	// Inicia la publicidad BLE indefinidamente
 	Bluefruit.Advertising.start( 0 ); 
 	
   } // ()
 
   // .........................................................
+  // .........................................................
+  
+  // Emitir anuncio iBeacon personalizado con carga libre (21 bytes de carga)
+  void emitirAnuncioIBeaconLibre( const char * carga, const uint8_t tamanyoCarga ) {
+
+	(*this).detenerAnuncio(); 
+
+	Bluefruit.Advertising.clearData();  // Limpia los datos de anuncio
+	Bluefruit.ScanResponse.clearData(); // Limpia la respuesta de escaneo
+
+	
+	Bluefruit.setName( (*this).nombreEmisora );
+	Bluefruit.ScanResponse.addName(); // Añade el nombre en la respuesta de escaneo
+
+	Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+
+  // Prepara el array que contendrá los 4 bytes de prefijo y los 21 bytes de la carga
+	uint8_t restoPrefijoYCarga[4+21] = {
+	  0x4c, 0x00, // companyID 2
+	  0x02, // ibeacon type 1byte
+	  21, // ibeacon length 1byte (dec=21)  longitud del resto // 0x15 // ibeacon length 1byte (dec=21)  longitud del resto
+	  '-', '-', '-', '-', 
+	  '-', '-', '-', '-', 
+	  '-', '-', '-', '-', 
+	  '-', '-', '-', '-', 
+	  '-', '-', '-', '-', 
+	  '-'
+	};
+
+	// Copia los datos de la carga en el array
+	memcpy( &restoPrefijoYCarga[4], &carga[0], ( tamanyoCarga > 21 ? 21 : tamanyoCarga ) ); 
+
+	// Añade los datos de la carga al anuncio
+	Bluefruit.Advertising.addData( BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA,
+								   &restoPrefijoYCarga[0],
+								   4+21 );
+
+	// Configuración del anuncio BLE
+	Bluefruit.Advertising.restartOnDisconnect(true); // Configuración del anuncio BLE
+	Bluefruit.Advertising.setInterval(100, 100);     // Intervalo de 0.625ms
+
+	Bluefruit.Advertising.setFastTimeout( 1 );      // Duración en modo rápido
+	Bluefruit.Advertising.start( 0 );               // Duración en modo rápido
+
+	Globales::elPuerto.escribir( "emitiriBeacon libre  Bluefruit.Advertising.start( 0 );  \n");
+  } // ()
+
+  // .........................................................
+  // .........................................................
+  // Añadir un servicio BLE a la emisor
+  bool anyadirServicio( ServicioEnEmisora & servicio ) {
+
+	Globales::elPuerto.escribir( " Bluefruit.Advertising.addService( servicio ); \n");
+	bool r = Bluefruit.Advertising.addService( servicio );
+
+	if ( ! r ) {
+	  Serial.println( " SERVICION NO AÑADIDO \n");
+	}
+
+	return r;
+  } // ()
+  
+  // .........................................................
+  // .........................................................
+  // Añadir servicio con características BLE
+  bool anyadirServicioConSusCaracteristicas( ServicioEnEmisora & servicio ) { 
+	return (*this).anyadirServicio( servicio ); // Añade el servicio con características
+  } // 
+
+  // .........................................................
+  // Sobrecarga para añadir múltiples características a un servicio
+  template <typename ... T>
+  bool anyadirServicioConSusCaracteristicas( ServicioEnEmisora & servicio,
+											 ServicioEnEmisora::Caracteristica & caracteristica,
+											 T& ... restoCaracteristicas) {
+
+	servicio.anyadirCaracteristica( caracteristica );// Añade una característica al servicio
+
+	return anyadirServicioConSusCaracteristicas( servicio, restoCaracteristicas... );// Añade el resto
+	
+  } // ()
+
+  // .........................................................
+
+  // Añadir servicio con características y activarlo
+  template <typename ... T>
+  bool anyadirServicioConSusCaracteristicasYActivar( ServicioEnEmisora & servicio,
+													 // ServicioEnEmisora::Caracteristica & caracteristica,
+													 T& ... restoCaracteristicas) {
+
+	bool r = anyadirServicioConSusCaracteristicas( servicio, restoCaracteristicas... );
+
+	servicio.activarServicio();
+
+	return r;
+	
+  } // ()
+
+  // .........................................................
+  // .........................................................
+  // Instala el callback para manejar conexiones BLE
+  void instalarCallbackConexionEstablecida( CallbackConexionEstablecida cb ) {
+	Bluefruit.Periph.setConnectCallback( cb );
+  } // ()
+
+  // .........................................................
+  // .........................................................
+  void instalarCallbackConexionTerminada( CallbackConexionTerminada cb ) {
+	Bluefruit.Periph.setDisconnectCallback( cb );
+  } // ()
+
+  // .........................................................
+  // .........................................................
+  BLEConnection * getConexion( uint16_t connHandle ) {
+	return Bluefruit.Connection( connHandle );
+  } // ()
+
+}; // class
+
+#endif
+
+// ----------------------------------------------------------
+// ----------------------------------------------------------
+// ----------------------------------------------------------
+// ----------------------------------------------------------
+
+// .........................................................
   //
   // Ejemplo de Beacon (31 bytes)
   //
@@ -179,141 +305,3 @@ public:
 
 	const uint8_t tamanyoCarga = strlen( carga );
   */
-  void emitirAnuncioIBeaconLibre( const char * carga, const uint8_t tamanyoCarga ) {
-
-	(*this).detenerAnuncio(); 
-
-	Bluefruit.Advertising.clearData();
-	Bluefruit.ScanResponse.clearData(); // hace falta?
-
-	// Bluefruit.setTxPower( (*this).txPower ); creo que no lo pongo porque es uno de los bytes de la parte de carga que utilizo
-	Bluefruit.setName( (*this).nombreEmisora );
-	Bluefruit.ScanResponse.addName();
-
-	Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-
-	// con este parece que no va  !
-	// Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE);
-
-	//
-	// hasta ahora habrá, supongo, ya puestos los 5 primeros bytes. Efectivamente.
-	// Falta poner 4 bytes fijos (company ID, beacon type, longitud) y 21 de carga
-	//
-	uint8_t restoPrefijoYCarga[4+21] = {
-	  0x4c, 0x00, // companyID 2
-	  0x02, // ibeacon type 1byte
-	  21, // ibeacon length 1byte (dec=21)  longitud del resto // 0x15 // ibeacon length 1byte (dec=21)  longitud del resto
-	  '-', '-', '-', '-', 
-	  '-', '-', '-', '-', 
-	  '-', '-', '-', '-', 
-	  '-', '-', '-', '-', 
-	  '-', '-', '-', '-', 
-	  '-'
-	};
-
-	//
-	// addData() hay que usarlo sólo una vez. Por eso copio la carga
-	// en el anterior array, donde he dejado 21 sitios libres
-	//
-	memcpy( &restoPrefijoYCarga[4], &carga[0], ( tamanyoCarga > 21 ? 21 : tamanyoCarga ) ); 
-
-	//
-	// copio la carga para emitir
-	//
-	Bluefruit.Advertising.addData( BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA,
-								   &restoPrefijoYCarga[0],
-								   4+21 );
-
-	//
-	// ? qué valores poner aquí ?
-	//
-	Bluefruit.Advertising.restartOnDisconnect(true);
-	Bluefruit.Advertising.setInterval(100, 100);    // in unit of 0.625 ms
-
-	Bluefruit.Advertising.setFastTimeout( 1 );      // number of seconds in fast mode
-	//
-	// empieza el anuncio, 0 = tiempo indefinido (ya lo pararán)
-	//
-	Bluefruit.Advertising.start( 0 ); 
-
-	Globales::elPuerto.escribir( "emitiriBeacon libre  Bluefruit.Advertising.start( 0 );  \n");
-  } // ()
-
-  // .........................................................
-  // .........................................................
-  bool anyadirServicio( ServicioEnEmisora & servicio ) {
-
-	Globales::elPuerto.escribir( " Bluefruit.Advertising.addService( servicio ); \n");
-
-	bool r = Bluefruit.Advertising.addService( servicio );
-
-	if ( ! r ) {
-	  Serial.println( " SERVICION NO AÑADIDO \n");
-	}
-	
-
-	return r;
-	 // nota: uso conversión de tipo de servicio (ServicioEnEmisora) a BLEService
-	 // para addService()
-  } // ()
-
-  
-  // .........................................................
-  // .........................................................
-  bool anyadirServicioConSusCaracteristicas( ServicioEnEmisora & servicio ) { 
-	return (*this).anyadirServicio( servicio );
-  } // 
-
-  // .........................................................
-  template <typename ... T>
-  bool anyadirServicioConSusCaracteristicas( ServicioEnEmisora & servicio,
-											 ServicioEnEmisora::Caracteristica & caracteristica,
-											 T& ... restoCaracteristicas) {
-
-	servicio.anyadirCaracteristica( caracteristica );
-
-	return anyadirServicioConSusCaracteristicas( servicio, restoCaracteristicas... );
-	
-  } // ()
-
-  // .........................................................
-  template <typename ... T>
-  bool anyadirServicioConSusCaracteristicasYActivar( ServicioEnEmisora & servicio,
-													 // ServicioEnEmisora::Caracteristica & caracteristica,
-													 T& ... restoCaracteristicas) {
-
-	bool r = anyadirServicioConSusCaracteristicas( servicio, restoCaracteristicas... );
-
-	servicio.activarServicio();
-
-	return r;
-	
-  } // ()
-
-  // .........................................................
-  // .........................................................
-  void instalarCallbackConexionEstablecida( CallbackConexionEstablecida cb ) {
-	Bluefruit.Periph.setConnectCallback( cb );
-  } // ()
-
-  // .........................................................
-  // .........................................................
-  void instalarCallbackConexionTerminada( CallbackConexionTerminada cb ) {
-	Bluefruit.Periph.setDisconnectCallback( cb );
-  } // ()
-
-  // .........................................................
-  // .........................................................
-  BLEConnection * getConexion( uint16_t connHandle ) {
-	return Bluefruit.Connection( connHandle );
-  } // ()
-
-}; // class
-
-#endif
-
-// ----------------------------------------------------------
-// ----------------------------------------------------------
-// ----------------------------------------------------------
-// ----------------------------------------------------------
-

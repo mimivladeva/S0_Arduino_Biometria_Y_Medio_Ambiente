@@ -16,13 +16,17 @@ class PuertoSerie  {
 public:
   // .........................................................
   // .........................................................
-  PuertoSerie (long baudios) {
+  // Constructor de la clase PuertoSerie
+  // Inicializa la comunicación serie a una velocidad especificada en baudios.
+  PuertoSerie (long baudios) { // Inicia la comunicación serie con la velocidad especificada.
 	Serial.begin( baudios );
-	// mejor no poner esto aquí: while ( !Serial ) delay(10);   
+	
   } // ()
 
   // .........................................................
   // .........................................................
+  
+  // Método para esperar a que el puerto serie esté disponible.
   void esperarDisponible() {
 
 	delay(10);   
@@ -31,9 +35,10 @@ public:
 
   // .........................................................
   // .........................................................
+    // Método genérico para escribir un mensaje en el puerto serie.
   template<typename T>
   void escribir (T mensaje) {
-	Serial.print( mensaje );
+	Serial.print( mensaje );// Envía el mensaje al puerto serie.
   } // ()
   
 }; // class PuertoSerie

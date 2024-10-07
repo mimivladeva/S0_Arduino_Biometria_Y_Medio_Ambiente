@@ -1,8 +1,8 @@
 // -*- mode: c++ -*-
 
 // ----------------------------------------------------------
-// Jordi Bataller i Mascarell
-// 2019-07-07
+// Mimi Stanimirova Vladeva
+// 2024-07-10
 // ----------------------------------------------------------
 #ifndef EMISORA_H_INCLUIDO
 #define EMISORA_H_INCLUIDO
@@ -18,10 +18,12 @@
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
+
 #include "ServicioEnEmisora.h"
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
+
 class EmisoraBLE {
 private:
 
@@ -33,6 +35,7 @@ public:
 
   // .........................................................
   // .........................................................
+
   using CallbackConexionEstablecida = void ( uint16_t connHandle );
   using CallbackConexionTerminada = void ( uint16_t connHandle, uint8_t reason);
 
@@ -45,43 +48,23 @@ public:
 	fabricanteID( fabricanteID_ ) ,
 	txPower( txPower_ )
   {
-	// no encender ahora la emisora, tal vez sea por el println()
-	// que hace que todo falle si lo llamo en el contructor
-	// ( = antes que configuremos Serial )
-	// No parece que sea por el println,
-	// por tanto NO_encenderEmisora();
+	
   } // ()
 
   // .........................................................
   // .........................................................
-  /* creo que no me sirve esta versión porque parece
-	 que no se instalen los callbacks si la emisora no está encendida,
-	 pero no la puedo encender en el constructor 
-  EmisoraBLE( const char * nombreEmisora_, const uint16_t fabricanteID_,
-			  const int8_t txPower_,
-			  CallbackConexionEstablecida cbce,
-			  CallbackConexionTerminada cbct
-			  ) 
-	:
-	EmisoraBLE ( nombreEmisora_, fabricanteID_, txPower_ )
-  {
-	instalarCallbackConexionEstablecida( cbce );
-	instalarCallbackConexionTerminada( cbct );
-  } // ()
-  */
-	
-  // .........................................................
-  // .........................................................
+  
   void encenderEmisora() {
-	// Serial.println ( "Bluefruit.begin() " );
+
 	 Bluefruit.begin(); 
 
-	 // por si acaso:
+	
 	 (*this).detenerAnuncio();
   } // ()
 
   // .........................................................
   // .........................................................
+
   void encenderEmisora( CallbackConexionEstablecida cbce,
 						CallbackConexionTerminada cbct ) {
 
@@ -97,14 +80,14 @@ public:
   void detenerAnuncio() {
 
 	if ( (*this).estaAnunciando() ) {
-	  // Serial.println ( "Bluefruit.Advertising.stop() " );
+	
 	  Bluefruit.Advertising.stop(); 
 	}
 
   }  // ()
   
   // .........................................................
-  // estaAnunciando() -> Boleano
+
   // .........................................................
   bool estaAnunciando() {
 	return Bluefruit.Advertising.isRunning();
@@ -114,28 +97,24 @@ public:
   // .........................................................
   void emitirAnuncioIBeacon( uint8_t * beaconUUID, int16_t major, int16_t minor, uint8_t rssi ) {
 
-	//
-	//
-	//
 	(*this).detenerAnuncio();
 	
 	//
 	// creo el beacon 
 	//
+	
 	BLEBeacon elBeacon( beaconUUID, major, minor, rssi );
 	elBeacon.setManufacturer( (*this).fabricanteID );
 
-	//
-	// parece que esto debe ponerse todo aquí
-	//
 
 	Bluefruit.setTxPower( (*this).txPower );
 	Bluefruit.setName( (*this).nombreEmisora );
-	Bluefruit.ScanResponse.addName(); // para que envíe el nombre de emisora (?!)
+	Bluefruit.ScanResponse.addName()
 
 	//
 	// pongo el beacon
 	//
+	
 	Bluefruit.Advertising.setBeacon( elBeacon );
 
 	//

@@ -1,9 +1,10 @@
 // -*- mode: c++ -*-
 
 // ----------------------------------------------------------
-// Jordi Bataller i Mascarell
-// 2019-07-17
+// Mimi Stanimirova Vladeva
+// 2024-07-10
 // ----------------------------------------------------------
+
 #ifndef SERVICIO_EMISORA_H_INCLUIDO
 #define SERVICIO_EMISORA_H_INCLUIDO
 
